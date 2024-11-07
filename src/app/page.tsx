@@ -1,101 +1,301 @@
-import Image from "next/image";
+"use client";
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export default function Home() {
+const PUZZLES = {
+  "2932088": {
+    regions: [
+      [0, 0, 0, 1, 1, 1, 1, 1, 1],
+      [0, 0, 0, 6, 6, 1, 3, 3, 3],
+      [0, 0, 6, 6, 6, 1, 1, 3, 4],
+      [6, 6, 6, 6, 6, 1, 1, 5, 4],
+      [5, 5, 5, 6, 6, 6, 5, 5, 4],
+      [5, 5, 5, 6, 6, 6, 5, 4, 4],
+      [7, 5, 6, 6, 6, 4, 4, 4, 4],
+      [7, 7, 7, 8, 8, 8, 4, 4, 4],
+      [7, 7, 7, 7, 4, 4, 4, 4, 4]
+    ]
+  }
+};
+
+const Home = () => {
+  const [selectedPuzzle, setSelectedPuzzle] = useState('2932088');
+  const [board, setBoard] = useState(Array(9).fill().map(() => Array(9).fill(false)));
+  const [solving, setSolving] = useState(false);
+  const [starCount, setStarCount] = useState(2);
+  const [progress, setProgress] = useState(0);
+
+  const hasWall = (row, col, direction) => {
+    if (row === 0 && direction === 'top') return true;
+    if (row === 8 && direction === 'bottom') return true;
+    if (col === 0 && direction === 'left') return true;
+    if (col === 8 && direction === 'right') return true;
+
+    if (!PUZZLES[selectedPuzzle]) return false;
+    const regions = PUZZLES[selectedPuzzle].regions;
+    const currentRegion = regions[row][col];
+
+    switch (direction) {
+      case 'top':
+        return row > 0 && regions[row - 1][col] !== currentRegion;
+      case 'right':
+        return col < 8 && regions[row][col + 1] !== currentRegion;
+      case 'bottom':
+        return row < 8 && regions[row + 1][col] !== currentRegion;
+      case 'left':
+        return col > 0 && regions[row][col - 1] !== currentRegion;
+      default:
+        return false;
+    }
+  };
+
+  const countStarsInRow = (board, row) => {
+    return board[row].filter(cell => cell).length;
+  };
+
+  const countStarsInColumn = (board, col) => {
+    return board.map(row => row[col]).filter(cell => cell).length;
+  };
+
+  const countAdjacentStars = (board, row, col) => {
+    const directions = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+    let count = 0;
+    for (const [dx, dy] of directions) {
+      const newRow = row + dx;
+      const newCol = col + dy;
+      if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
+        if (board[newRow][newCol]) count++;
+      }
+    }
+    return count;
+  };
+
+  const isValidPosition = (board, row, col) => {
+    if (board[row][col]) return true;
+
+    if (countStarsInRow(board, row) >= starCount) return false;
+    if (countStarsInColumn(board, col) >= starCount) return false;
+    if (countAdjacentStars(board, row, col) > 0) return false;
+
+    return true;
+  };
+
+  const checkRegion = (board, regions, regionId) => {
+    let count = 0;
+    for (let i = 0; i < 9; i++) {
+      for (let j = 0; j < 9; j++) {
+        if (regions[i][j] === regionId && board[i][j]) {
+          count++;
+        }
+      }
+    }
+    return count === starCount;
+  };
+
+  const isBoardValid = (board) => {
+    const regions = PUZZLES[selectedPuzzle].regions;
+    const regionCounts = new Array(9).fill(0);
+
+    // Verificar filas, columnas y regiones en una sola pasada
+    for (let i = 0; i < 9; i++) {
+      let rowCount = 0;
+      let colCount = 0;
+
+      for (let j = 0; j < 9; j++) {
+        // Contar estrellas en fila
+        if (board[i][j]) {
+          rowCount++;
+          regionCounts[regions[i][j]]++;
+
+          // Verificar adyacencias
+          if (countAdjacentStars(board, i, j) > 0) return false;
+        }
+
+        // Contar estrellas en columna
+        if (board[j][i]) colCount++;
+      }
+
+      // Verificar cantidad de estrellas en fila y columna
+      if (rowCount !== starCount || colCount !== starCount) return false;
+    }
+
+    // Verificar cantidad de estrellas en cada región
+    return regionCounts.every(count => count === starCount);
+  };
+
+  const solve = async (currentBoard, row = 0, col = 0) => {
+    if (row >= 9) {
+      return isBoardValid(currentBoard);
+    }
+
+    const nextRow = col === 8 ? row + 1 : row;
+    const nextCol = col === 8 ? 0 : col + 1;
+
+    if (countStarsInRow(currentBoard, row) > starCount ||
+      countStarsInColumn(currentBoard, col) > starCount) {
+      return false;
+    }
+
+    // Actualizar progreso
+    setProgress(Math.floor((row * 9 + col) / 81 * 100));
+
+    // Intentar sin colocar estrella
+    if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
+      return true;
+    }
+
+    // Intentar colocar estrella
+    if (isValidPosition(currentBoard, row, col)) {
+      currentBoard[row][col] = true;
+      if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
+        return true;
+      }
+      currentBoard[row][col] = false;
+    }
+
+    return false;
+  };
+
+  const handleSolve = async () => {
+    setSolving(true);
+    setProgress(0);
+    try {
+      const newBoard = board.map(row => [...row]);
+
+      // Verificar si el tablero actual ya es una solución válida
+      if (isBoardValid(newBoard)) {
+        setProgress(100);
+        alert("¡El tablero ya está resuelto correctamente!");
+        setSolving(false);
+        return;
+      }
+
+      // Si no es una solución válida, intentar resolver
+      const solved = await solve(newBoard);
+      if (solved) {
+        setBoard(newBoard);
+      } else {
+        alert("No se encontró solución para este puzzle");
+      }
+    } catch (error) {
+      console.error("Error al resolver:", error);
+      alert("Ocurrió un error al intentar resolver el puzzle");
+    } finally {
+      setSolving(false);
+      setProgress(100);
+    }
+  };
+
+  const handleCellClick = (row, col) => {
+    if (!solving) {
+      const newBoard = board.map(r => [...r]);
+      if (board[row][col] || isValidPosition(newBoard, row, col)) {
+        newBoard[row][col] = !newBoard[row][col];
+        setBoard(newBoard);
+
+        // Verifica si el tablero actual es válido después de cada cambio
+        if (isBoardValid(newBoard)) {
+          setProgress(100);
+          alert("¡Felicidades! Has resuelto el puzzle.");
+          setSolving(false);
+        }
+      }
+    }
+  };
+
+  const handleReset = () => {
+    setBoard(Array(9).fill().map(() => Array(9).fill(false)));
+    setProgress(0);
+  };
+
+  const handleStarCountChange = (value) => {
+    setStarCount(parseInt(value));
+    handleReset();
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <Card className="w-full max-w-xl mx-auto">
+      <CardHeader>
+        <CardTitle>Star Battle Puzzle ({starCount}★)</CardTitle>
+        <div className="flex gap-4 flex-wrap">
+          <Select value={selectedPuzzle} onValueChange={(value) => {
+            setSelectedPuzzle(value);
+            handleReset();
+          }}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select puzzle" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(PUZZLES).map(id => (
+                <SelectItem key={id} value={id}>Puzzle {id}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={starCount.toString()} onValueChange={handleStarCountChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select star count" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 Star</SelectItem>
+              <SelectItem value="2">2 Stars</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={handleSolve} disabled={solving}>
+            {solving ? 'Solving...' : 'Solve'}
+          </Button>
+          <Button onClick={handleReset} variant="outline">
+            Reset
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-9 gap-0 p-4 bg-gray-200 relative">
+          <div className="absolute inset-0 border-2 border-black"></div>
+          {board.map((row, i) =>
+            row.map((cell, j) => {
+              const region = PUZZLES[selectedPuzzle].regions[i][j];
+              return (
+                <div
+                  key={`${i}-${j}`}
+                  className="relative"
+                >
+                  <button
+                    onClick={() => handleCellClick(i, j)}
+                    className={`
+                      w-12 h-12 flex items-center justify-center
+                      bg-white transition-colors
+                      ${cell ? 'text-yellow-600 text-2xl font-bold' : ''}
+                      hover:bg-gray-50
+                    `}
+                    disabled={solving}
+                  >
+                    {cell && '★'}
+                  </button>
+                  {hasWall(i, j, 'top') && <div className="absolute top-0 left-0 right-0 h-0.5 bg-black" />}
+                  {hasWall(i, j, 'right') && <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-black" />}
+                  {hasWall(i, j, 'bottom') && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
+                  {hasWall(i, j, 'left') && <div className="absolute top-0 left-0 bottom-0 w-0.5 bg-black" />}
+                </div>
+              );
+            })
+          )}
+        </div>
+        {solving && (
+          <div className="mt-4">
+            <div className="h-2 w-full bg-gray-200 rounded">
+              <div
+                className="h-full bg-blue-600 rounded transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-sm text-center mt-1">Buscando solución... {progress}%</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
-}
+};
+
+export default Home;
