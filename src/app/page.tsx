@@ -1,10 +1,17 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const PUZZLES = {
+type PuzzleType = {
+  [key: string]: {
+    regions: number[][];
+  };
+};
+
+const PUZZLES: PuzzleType = {
   "2932088": {
     regions: [
       [0, 0, 0, 1, 1, 1, 1, 1, 1],
@@ -21,13 +28,13 @@ const PUZZLES = {
 };
 
 const Home = () => {
-  const [selectedPuzzle, setSelectedPuzzle] = useState('2932088');
-  const [board, setBoard] = useState(Array(9).fill().map(() => Array(9).fill(false)));
+  const [selectedPuzzle, setSelectedPuzzle] = useState<keyof typeof PUZZLES>("2932088");
+  const [board, setBoard] = useState<boolean[][]>(Array(9).fill(null).map(() => Array(9).fill(false)));
   const [solving, setSolving] = useState(false);
   const [starCount, setStarCount] = useState(2);
   const [progress, setProgress] = useState(0);
 
-  const hasWall = (row, col, direction) => {
+  const hasWall = (row: number, col: number, direction: string): boolean => {
     if (row === 0 && direction === 'top') return true;
     if (row === 8 && direction === 'bottom') return true;
     if (col === 0 && direction === 'left') return true;
@@ -51,15 +58,15 @@ const Home = () => {
     }
   };
 
-  const countStarsInRow = (board, row) => {
+  const countStarsInRow = (board: boolean[][], row: number): number => {
     return board[row].filter(cell => cell).length;
   };
 
-  const countStarsInColumn = (board, col) => {
+  const countStarsInColumn = (board: boolean[][], col: number): number => {
     return board.map(row => row[col]).filter(cell => cell).length;
   };
 
-  const countAdjacentStars = (board, row, col) => {
+  const countAdjacentStars = (board: boolean[][], row: number, col: number): number => {
     const directions = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
     let count = 0;
     for (const [dx, dy] of directions) {
@@ -72,7 +79,7 @@ const Home = () => {
     return count;
   };
 
-  const isValidPosition = (board, row, col) => {
+  const isValidPosition = (board: boolean[][], row: number, col: number): boolean => {
     if (board[row][col]) return true;
 
     if (countStarsInRow(board, row) >= starCount) return false;
@@ -82,7 +89,7 @@ const Home = () => {
     return true;
   };
 
-  const checkRegion = (board, regions, regionId) => {
+  const checkRegion = (board: boolean[][], regions: number[][], regionId: number): boolean => {
     let count = 0;
     for (let i = 0; i < 9; i++) {
       for (let j = 0; j < 9; j++) {
@@ -94,38 +101,31 @@ const Home = () => {
     return count === starCount;
   };
 
-  const isBoardValid = (board) => {
+  const isBoardValid = (board: boolean[][]): boolean => {
     const regions = PUZZLES[selectedPuzzle].regions;
     const regionCounts = new Array(9).fill(0);
 
-    // Verificar filas, columnas y regiones en una sola pasada
     for (let i = 0; i < 9; i++) {
       let rowCount = 0;
       let colCount = 0;
 
       for (let j = 0; j < 9; j++) {
-        // Contar estrellas en fila
         if (board[i][j]) {
           rowCount++;
           regionCounts[regions[i][j]]++;
-
-          // Verificar adyacencias
           if (countAdjacentStars(board, i, j) > 0) return false;
         }
 
-        // Contar estrellas en columna
         if (board[j][i]) colCount++;
       }
 
-      // Verificar cantidad de estrellas en fila y columna
       if (rowCount !== starCount || colCount !== starCount) return false;
     }
 
-    // Verificar cantidad de estrellas en cada región
     return regionCounts.every(count => count === starCount);
   };
 
-  const solve = async (currentBoard, row = 0, col = 0) => {
+  const solve = async (currentBoard: boolean[][], row = 0, col = 0): Promise<boolean> => {
     if (row >= 9) {
       return isBoardValid(currentBoard);
     }
@@ -138,15 +138,12 @@ const Home = () => {
       return false;
     }
 
-    // Actualizar progreso
     setProgress(Math.floor((row * 9 + col) / 81 * 100));
 
-    // Intentar sin colocar estrella
     if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
       return true;
     }
 
-    // Intentar colocar estrella
     if (isValidPosition(currentBoard, row, col)) {
       currentBoard[row][col] = true;
       if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
@@ -188,7 +185,7 @@ const Home = () => {
     }
   };
 
-  const handleCellClick = (row, col) => {
+  const handleCellClick = (row: number, col: number): void => {
     if (!solving) {
       const newBoard = board.map(r => [...r]);
       if (board[row][col] || isValidPosition(newBoard, row, col)) {
@@ -206,11 +203,11 @@ const Home = () => {
   };
 
   const handleReset = () => {
-    setBoard(Array(9).fill().map(() => Array(9).fill(false)));
+    setBoard(Array(9).fill(null).map(() => Array(9).fill(false)));
     setProgress(0);
   };
 
-  const handleStarCountChange = (value) => {
+  const handleStarCountChange = (value: string) => {
     setStarCount(parseInt(value));
     handleReset();
   };
@@ -220,10 +217,13 @@ const Home = () => {
       <CardHeader>
         <CardTitle>Star Battle Puzzle ({starCount}★)</CardTitle>
         <div className="flex gap-4 flex-wrap">
-          <Select value={selectedPuzzle} onValueChange={(value) => {
-            setSelectedPuzzle(value);
-            handleReset();
-          }}>
+          <Select
+            value={selectedPuzzle.toString()}
+            onValueChange={(value: string) => {
+              setSelectedPuzzle(value as keyof typeof PUZZLES);
+              handleReset();
+            }}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select puzzle" />
             </SelectTrigger>
