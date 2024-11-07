@@ -158,21 +158,20 @@ const Home = () => {
   const handleSolve = async () => {
     setSolving(true);
     setProgress(0);
-    try {
-      const newBoard = board.map(row => [...row]);
 
-      // Verificar si el tablero actual ya es una solución válida
-      if (isBoardValid(newBoard)) {
+    try {
+      // Verifica si el estado actual del tablero ya es una solución válida
+      if (isBoardValid(board)) {
         setProgress(100);
         alert("¡El tablero ya está resuelto correctamente!");
         setSolving(false);
         return;
       }
 
-      // Si no es una solución válida, intentar resolver
-      const solved = await solve(newBoard);
+      // Si no es una solución válida, intenta resolverlo a partir del estado actual
+      const solved = await solve(board); // Esto partirá desde el estado actual
       if (solved) {
-        setBoard(newBoard);
+        setBoard(board);
       } else {
         alert("No se encontró solución para este puzzle");
       }
@@ -185,18 +184,23 @@ const Home = () => {
     }
   };
 
-  const handleCellClick = (row: number, col: number): void => {
+  const handleCellClick = (row, col) => {
     if (!solving) {
       const newBoard = board.map(r => [...r]);
+
+      // Cambia el estado de la celda en el tablero
       if (board[row][col] || isValidPosition(newBoard, row, col)) {
         newBoard[row][col] = !newBoard[row][col];
         setBoard(newBoard);
 
-        // Verifica si el tablero actual es válido después de cada cambio
-        if (isBoardValid(newBoard)) {
+        // Verifica si se han colocado todas las estrellas
+        const totalStars = newBoard.flat().filter(cell => cell).length;
+        if (totalStars === 18 && isBoardValid(newBoard)) { // 18 estrellas en un tablero de 9x9 con 2 estrellas por fila/columna
           setProgress(100);
           alert("¡Felicidades! Has resuelto el puzzle.");
           setSolving(false);
+        } else {
+          setProgress(Math.floor((totalStars / 18) * 100)); // Actualiza progreso según cantidad de estrellas
         }
       }
     }
