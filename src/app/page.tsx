@@ -473,6 +473,28 @@ const Home = () => {
           </div>
         )}
       </CardContent>
+      <div className="p-4 bg-gray-100 border-t border-gray-300">
+        <h2 className="text-lg font-semibold">Notas sobre la ejecución del programa</h2>
+        <p>
+          Este programa es un juego de rompecabezas llamado "Star Battle Puzzle". Actualmente se encuentra en fase beta, lo que significa que puede haber errores y características que aún están en desarrollo.
+        </p>
+        <h3 className="font-semibold">Instrucciones para ejecutar el programa:</h3>
+        <ol className="list-decimal list-inside">
+          <li>
+            <strong>Tamaño de la cuadrícula:</strong> Al iniciar la aplicación, se te pedirá que ingreses el tamaño de la cuadrícula. Este tamaño debe estar entre 5 y 14. Puedes ingresar el tamaño manualmente en el campo de entrada correspondiente.
+          </li>
+          <li>
+            <strong>Carga del archivo:</strong> Después de establecer el tamaño de la cuadrícula, puedes cargar un archivo de texto que contenga la configuración del rompecabezas. <strong>Importante:</strong> Asegúrate de que el archivo tenga el formato correcto. La primera línea debe contener el tamaño de la cuadrícula, seguido de las líneas que representan las regiones del rompecabezas. Si experimentas problemas al cargar el archivo, intenta primero establecer el tamaño de la cuadrícula y luego cargar el archivo. Esto puede ayudar a evitar errores en la carga de las regiones.
+          </li>
+          <li>
+            <strong>Resolución del rompecabezas:</strong> Una vez que hayas configurado el tamaño y cargado el archivo, puedes hacer clic en el botón "Solve" para intentar resolver el rompecabezas. Si el rompecabezas ya está resuelto, recibirás una notificación.
+          </li>
+        </ol>
+        <p>
+          Si encuentras errores al cargar el archivo, verifica que el contenido del archivo sea válido y que no haya líneas en blanco o caracteres inesperados. Agradecemos tu comprensión mientras trabajamos en mejorar la estabilidad y funcionalidad del programa.
+        </p>
+        <p>¡Diviértete resolviendo el rompecabezas!</p>
+      </div>
     </Card>
   );
 };
