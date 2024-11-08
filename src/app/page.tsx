@@ -31,6 +31,7 @@ const parseInput = (
       .trim()
       .split("\n")
       .map((line) => line.trim());
+    console.log("Líneas procesadas:", lines); // Para depuración
     const size = parseInt(lines[0]);
 
     if (isNaN(size) || size < 5 || size > 14) {
@@ -46,6 +47,7 @@ const parseInput = (
     const regions = [];
     for (let i = 1; i <= size; i++) {
       const row = lines[i].split(/\s+/).map(Number);
+      console.log(`Fila ${i}:`, row); // Para depuración
       if (row.length !== size || row.some((n) => isNaN(n))) {
         throw new Error(`Formato inválido en la línea ${i}`);
       }
@@ -345,8 +347,8 @@ const Home = () => {
           console.log("Contenido del archivo:", text); // Para depuración
           try {
             const result = parseInput(text);
+            console.log("Resultado de parseInput:", result); // Para depuración
             if (result) {
-              console.log("Resultado procesado:", result); // Para depuración
               setGridSize(result.size);
               setStarCount(determineStarCount(result.size));
               setRegions(result.regions);
@@ -357,6 +359,8 @@ const Home = () => {
               );
               setProgress(0);
               setError("");
+            } else {
+              setError("No se pudo procesar el archivo. Verifica el formato.");
             }
           } catch (error) {
             if (error instanceof Error) {
@@ -384,7 +388,12 @@ const Home = () => {
                 min="5"
                 max="14"
                 value={gridSize}
-                onChange={(e) => handleSizeChange(parseInt(e.target.value))}
+                onChange={(e) => {
+                  const newValue = parseInt(e.target.value);
+                  if (newValue >= 5 && newValue <= 14) {
+                    handleSizeChange(newValue);
+                  }
+                }}
                 className="w-24"
               />
               <Input
