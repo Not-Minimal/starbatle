@@ -1,98 +1,189 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type PuzzleType = {
-  [key: string]: {
-    regions: number[][];
-  };
+const determineStarCount = (size: number): number => {
+  if (size >= 5 && size <= 8) return 1;
+  if (size >= 9 && size <= 13) return 2;
+  if (size === 14) return 3;
+  return 0;
 };
 
-const PUZZLES: PuzzleType = {
-  "2932088": {
-    regions: [
-      [0, 0, 0, 1, 1, 1, 1, 1, 1],
-      [0, 0, 0, 6, 6, 1, 3, 3, 3],
-      [0, 0, 6, 6, 6, 1, 1, 3, 4],
-      [6, 6, 6, 6, 6, 1, 1, 5, 4],
-      [5, 5, 5, 6, 6, 6, 5, 5, 4],
-      [5, 5, 5, 6, 6, 6, 5, 4, 4],
-      [7, 5, 6, 6, 6, 4, 4, 4, 4],
-      [7, 7, 7, 8, 8, 8, 4, 4, 4],
-      [7, 7, 7, 7, 4, 4, 4, 4, 4]
-    ]
+const createEmptyRegions = (size: number): number[][] => {
+  return Array(size)
+    .fill(null)
+    .map((_, i) =>
+      Array(size)
+        .fill(null)
+        .map((_, j) => i * size + j),
+    );
+};
+const parseInput = (
+  text: string,
+): { size: number; regions: number[][] } | null => {
+  try {
+    const lines = text
+      .trim()
+      .split("\n")
+      .map((line) => line.trim());
+    const size = parseInt(lines[0]);
+
+    if (isNaN(size) || size < 5 || size > 14) {
+      throw new Error(`Tamaño inválido: ${size}. Debe ser entre 5 y 14`);
+    }
+
+    if (lines.length !== size + 1) {
+      throw new Error(
+        `El archivo debe contener ${size + 1} líneas para un tablero ${size}x${size}`,
+      );
+    }
+
+    const regions = [];
+    for (let i = 1; i <= size; i++) {
+      const row = lines[i].split(/\s+/).map(Number);
+      if (row.length !== size || row.some((n) => isNaN(n))) {
+        throw new Error(`Formato inválido en la línea ${i}`);
+      }
+      regions.push(row);
+    }
+
+    const uniqueRegions = new Set(regions.flat());
+    if (uniqueRegions.size > size) {
+      throw new Error(
+        `Demasiadas regiones diferentes. Máximo permitido: ${size}`,
+      );
+    }
+
+    return { size, regions };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Error al procesar el archivo: ${error.message}`);
+    } else {
+      throw new Error(`Error desconocido al procesar el archivo`);
+    }
   }
 };
 
 const Home = () => {
-  const [selectedPuzzle, setSelectedPuzzle] = useState<keyof typeof PUZZLES>("2932088");
-  const [board, setBoard] = useState<boolean[][]>(Array(9).fill(null).map(() => Array(9).fill(false)));
+  const [gridSize, setGridSize] = useState<number>(5);
+  const [starCount, setStarCount] = useState<number>(1);
+  const [board, setBoard] = useState<boolean[][]>([[]]);
+  const [regions, setRegions] = useState<number[][]>([[]]);
   const [solving, setSolving] = useState(false);
-  const [starCount, setStarCount] = useState(2);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    handleSizeChange(gridSize);
+  }, [gridSize]);
+
+  const handleSizeChange = (newSize: number) => {
+    const size = Math.max(5, Math.min(14, newSize));
+    const stars = determineStarCount(size);
+
+    if (stars === 0) {
+      setError("Tamaño inválido. Debe ser entre 5x5 y 14x14");
+      return;
+    }
+
+    setError("");
+    setGridSize(size);
+    setStarCount(stars);
+    setBoard(
+      Array(size)
+        .fill(null)
+        .map(() => Array(size).fill(false)),
+    );
+    setRegions(createEmptyRegions(size));
+    setProgress(0);
+  };
 
   const hasWall = (row: number, col: number, direction: string): boolean => {
-    if (row === 0 && direction === 'top') return true;
-    if (row === 8 && direction === 'bottom') return true;
-    if (col === 0 && direction === 'left') return true;
-    if (col === 8 && direction === 'right') return true;
+    if (row === 0 && direction === "top") return true;
+    if (row === gridSize - 1 && direction === "bottom") return true;
+    if (col === 0 && direction === "left") return true;
+    if (col === gridSize - 1 && direction === "right") return true;
 
-    if (!PUZZLES[selectedPuzzle]) return false;
-    const regions = PUZZLES[selectedPuzzle].regions;
-    const currentRegion = regions[row][col];
+    const currentRegion = regions[row]?.[col];
 
     switch (direction) {
-      case 'top':
-        return row > 0 && regions[row - 1][col] !== currentRegion;
-      case 'right':
-        return col < 8 && regions[row][col + 1] !== currentRegion;
-      case 'bottom':
-        return row < 8 && regions[row + 1][col] !== currentRegion;
-      case 'left':
-        return col > 0 && regions[row][col - 1] !== currentRegion;
+      case "top":
+        return regions[row - 1]?.[col] !== currentRegion;
+      case "right":
+        return regions[row]?.[col + 1] !== currentRegion;
+      case "bottom":
+        return regions[row + 1]?.[col] !== currentRegion;
+      case "left":
+        return regions[row]?.[col - 1] !== currentRegion;
       default:
         return false;
     }
   };
 
   const countStarsInRow = (board: boolean[][], row: number): number => {
-    return board[row].filter(cell => cell).length;
+    return board[row].filter((cell) => cell).length;
   };
 
   const countStarsInColumn = (board: boolean[][], col: number): number => {
-    return board.map(row => row[col]).filter(cell => cell).length;
+    return board.map((row) => row[col]).filter((cell) => cell).length;
   };
 
-  const countAdjacentStars = (board: boolean[][], row: number, col: number): number => {
-    const directions = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+  const countAdjacentStars = (
+    board: boolean[][],
+    row: number,
+    col: number,
+  ): number => {
+    const directions = [
+      [-1, -1],
+      [-1, 0],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 0],
+      [1, 1],
+    ];
     let count = 0;
     for (const [dx, dy] of directions) {
       const newRow = row + dx;
       const newCol = col + dy;
-      if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
+      if (
+        newRow >= 0 &&
+        newRow < gridSize &&
+        newCol >= 0 &&
+        newCol < gridSize
+      ) {
         if (board[newRow][newCol]) count++;
       }
     }
     return count;
   };
 
-  const isValidPosition = (board: boolean[][], row: number, col: number): boolean => {
+  const isValidPosition = (
+    board: boolean[][],
+    row: number,
+    col: number,
+  ): boolean => {
     if (board[row][col]) return true;
-
     if (countStarsInRow(board, row) >= starCount) return false;
     if (countStarsInColumn(board, col) >= starCount) return false;
     if (countAdjacentStars(board, row, col) > 0) return false;
-
     return true;
   };
 
-  const checkRegion = (board: boolean[][], regions: number[][], regionId: number): boolean => {
+  const checkRegion = (
+    board: boolean[][],
+    regions: number[][],
+    regionId: number,
+  ): boolean => {
     let count = 0;
-    for (let i = 0; i < 9; i++) {
-      for (let j = 0; j < 9; j++) {
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
         if (regions[i][j] === regionId && board[i][j]) {
           count++;
         }
@@ -102,54 +193,85 @@ const Home = () => {
   };
 
   const isBoardValid = (board: boolean[][]): boolean => {
-    const regions = PUZZLES[selectedPuzzle].regions;
-    const regionCounts = new Array(9).fill(0);
+    const regionCounts = new Array(gridSize * gridSize).fill(0);
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < gridSize; i++) {
       let rowCount = 0;
       let colCount = 0;
 
-      for (let j = 0; j < 9; j++) {
+      for (let j = 0; j < gridSize; j++) {
         if (board[i][j]) {
           rowCount++;
           regionCounts[regions[i][j]]++;
           if (countAdjacentStars(board, i, j) > 0) return false;
         }
-
         if (board[j][i]) colCount++;
       }
 
       if (rowCount !== starCount || colCount !== starCount) return false;
     }
 
-    return regionCounts.every(count => count === starCount);
+    return regionCounts.every((count) => count <= starCount);
   };
 
-  const solve = async (currentBoard: boolean[][], row = 0, col = 0): Promise<boolean> => {
-    if (row >= 9) {
+  const solve = async (
+    currentBoard: boolean[][],
+    row = 0,
+    col = 0,
+  ): Promise<boolean> => {
+    if (row >= gridSize) {
       return isBoardValid(currentBoard);
     }
 
-    const nextRow = col === 8 ? row + 1 : row;
-    const nextCol = col === 8 ? 0 : col + 1;
+    const nextRow = col === gridSize - 1 ? row + 1 : row;
+    const nextCol = col === gridSize - 1 ? 0 : col + 1;
 
-    if (countStarsInRow(currentBoard, row) > starCount ||
-      countStarsInColumn(currentBoard, col) > starCount) {
+    if (
+      countStarsInRow(currentBoard, row) > starCount ||
+      countStarsInColumn(currentBoard, col) > starCount
+    ) {
       return false;
     }
 
-    setProgress(Math.floor((row * 9 + col) / 81 * 100));
+    // Actualizar el progreso y el tablero visible
+    setProgress(
+      Math.floor(((row * gridSize + col) / (gridSize * gridSize)) * 100),
+    );
+    setBoard([...currentBoard.map((row) => [...row])]);
 
-    if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
+    // Agregar un pequeño delay para poder ver la animación
+    await new Promise((resolve) => setTimeout(resolve, 2));
+
+    if (
+      await new Promise((resolve) =>
+        setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0),
+      )
+    ) {
       return true;
     }
 
     if (isValidPosition(currentBoard, row, col)) {
       currentBoard[row][col] = true;
-      if (await new Promise(resolve => setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0))) {
+      // Actualizar el tablero visible cuando se coloca una estrella
+      setBoard([...currentBoard.map((row) => [...row])]);
+
+      // Agregar un pequeño delay para ver la colocación de la estrella
+      await new Promise((resolve) => setTimeout(resolve, 2));
+
+      if (
+        await new Promise((resolve) =>
+          setTimeout(() => resolve(solve(currentBoard, nextRow, nextCol)), 0),
+        )
+      ) {
         return true;
       }
+
       currentBoard[row][col] = false;
+      // Actualizar el tablero visible cuando se quita una estrella
+      setBoard([...currentBoard.map((row) => [...row])]);
+
+      // Agregar un pequeño delay para ver la eliminación de la estrella
+      await new Promise((resolve) => setTimeout(resolve, 2));
     }
 
     return false;
@@ -160,7 +282,6 @@ const Home = () => {
     setProgress(0);
 
     try {
-      // Verifica si el estado actual del tablero ya es una solución válida
       if (isBoardValid(board)) {
         setProgress(100);
         alert("¡El tablero ya está resuelto correctamente!");
@@ -168,10 +289,11 @@ const Home = () => {
         return;
       }
 
-      // Si no es una solución válida, intenta resolverlo a partir del estado actual
-      const solved = await solve(board); // Esto partirá desde el estado actual
+      const newBoard = board.map((row) => [...row]);
+      const solved = await solve(newBoard);
+
       if (solved) {
-        setBoard(board);
+        alert("¡Solución encontrada!");
       } else {
         alert("No se encontró solución para este puzzle");
       }
@@ -184,106 +306,148 @@ const Home = () => {
     }
   };
 
-  const handleCellClick = (row, col) => {
+  const handleCellClick = (row: number, col: number) => {
     if (!solving) {
-      const newBoard = board.map(r => [...r]);
-
-      // Cambia el estado de la celda en el tablero
+      const newBoard = board.map((r) => [...r]);
       if (board[row][col] || isValidPosition(newBoard, row, col)) {
         newBoard[row][col] = !newBoard[row][col];
         setBoard(newBoard);
 
-        // Verifica si se han colocado todas las estrellas
-        const totalStars = newBoard.flat().filter(cell => cell).length;
-        if (totalStars === 18 && isBoardValid(newBoard)) { // 18 estrellas en un tablero de 9x9 con 2 estrellas por fila/columna
+        const totalStars = newBoard.flat().filter((cell) => cell).length;
+        const expectedTotalStars = starCount * gridSize;
+        if (totalStars === expectedTotalStars && isBoardValid(newBoard)) {
           setProgress(100);
           alert("¡Felicidades! Has resuelto el puzzle.");
           setSolving(false);
         } else {
-          setProgress(Math.floor((totalStars / 18) * 100)); // Actualiza progreso según cantidad de estrellas
+          setProgress(Math.floor((totalStars / expectedTotalStars) * 100));
         }
       }
     }
   };
 
   const handleReset = () => {
-    setBoard(Array(9).fill(null).map(() => Array(9).fill(false)));
+    setBoard(
+      Array(gridSize)
+        .fill(null)
+        .map(() => Array(gridSize).fill(false)),
+    );
     setProgress(0);
   };
 
-  const handleStarCountChange = (value: string) => {
-    setStarCount(parseInt(value));
-    handleReset();
+  const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result;
+        if (typeof text === "string") {
+          console.log("Contenido del archivo:", text); // Para depuración
+          try {
+            const result = parseInput(text);
+            if (result) {
+              console.log("Resultado procesado:", result); // Para depuración
+              setGridSize(result.size);
+              setStarCount(determineStarCount(result.size));
+              setRegions(result.regions);
+              setBoard(
+                Array(result.size)
+                  .fill(null)
+                  .map(() => Array(result.size).fill(false)),
+              );
+              setProgress(0);
+              setError("");
+            }
+          } catch (error) {
+            if (error instanceof Error) {
+              setError(error.message);
+            } else {
+              setError("Error desconocido al procesar el archivo");
+            }
+          }
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   return (
     <Card className="w-full max-w-xl mx-auto">
       <CardHeader>
         <CardTitle>Star Battle Puzzle ({starCount}★)</CardTitle>
-        <div className="flex gap-4 flex-wrap">
-          <Select
-            value={selectedPuzzle.toString()}
-            onValueChange={(value: string) => {
-              setSelectedPuzzle(value as keyof typeof PUZZLES);
-              handleReset();
-            }}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select puzzle" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(PUZZLES).map(id => (
-                <SelectItem key={id} value={id}>Puzzle {id}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={starCount.toString()} onValueChange={handleStarCountChange}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select star count" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">1 Star</SelectItem>
-              <SelectItem value="2">2 Stars</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleSolve} disabled={solving}>
-            {solving ? 'Solving...' : 'Solve'}
-          </Button>
-          <Button onClick={handleReset} variant="outline">
-            Reset
-          </Button>
+        <div className="space-y-4">
+          <div className="flex flex-col space-y-2">
+            <Label>Tamaño del tablero y regiones</Label>
+            <div className="flex gap-4">
+              <Input
+                type="number"
+                min="5"
+                max="14"
+                value={gridSize}
+                onChange={(e) => handleSizeChange(parseInt(e.target.value))}
+                className="w-24"
+              />
+              <Input
+                type="file"
+                accept=".txt"
+                onChange={handleFileInput}
+                className="flex-1"
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <Button onClick={handleSolve} disabled={solving}>
+              {solving ? "Solving..." : "Solve"}
+            </Button>
+            <Button onClick={handleReset} variant="outline">
+              Reset
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-9 gap-0 p-4 bg-gray-200 relative">
+        <div
+          className="grid gap-0 p-4 bg-gray-200 relative"
+          style={{
+            gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
+            width: "fit-content",
+          }}
+        >
           <div className="absolute inset-0 border-2 border-black"></div>
           {board.map((row, i) =>
-            row.map((cell, j) => {
-              const region = PUZZLES[selectedPuzzle].regions[i][j];
-              return (
-                <div
-                  key={`${i}-${j}`}
-                  className="relative"
+            row.map((cell, j) => (
+              <div key={`${i}-${j}`} className="relative">
+                <button
+                  onClick={() => handleCellClick(i, j)}
+                  className={`
+                    w-12 h-12 flex items-center justify-center
+                    bg-white transition-colors
+                    ${cell ? "text-yellow-600 text-2xl font-bold" : ""}
+                    hover:bg-gray-50
+                  `}
+                  disabled={solving}
                 >
-                  <button
-                    onClick={() => handleCellClick(i, j)}
-                    className={`
-                      w-12 h-12 flex items-center justify-center
-                      bg-white transition-colors
-                      ${cell ? 'text-yellow-600 text-2xl font-bold' : ''}
-                      hover:bg-gray-50
-                    `}
-                    disabled={solving}
-                  >
-                    {cell && '★'}
-                  </button>
-                  {hasWall(i, j, 'top') && <div className="absolute top-0 left-0 right-0 h-0.5 bg-black" />}
-                  {hasWall(i, j, 'right') && <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-black" />}
-                  {hasWall(i, j, 'bottom') && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />}
-                  {hasWall(i, j, 'left') && <div className="absolute top-0 left-0 bottom-0 w-0.5 bg-black" />}
-                </div>
-              );
-            })
+                  {cell && "★"}
+                </button>
+                {hasWall(i, j, "top") && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-black" />
+                )}
+                {hasWall(i, j, "right") && (
+                  <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-black" />
+                )}
+                {hasWall(i, j, "bottom") && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />
+                )}
+                {hasWall(i, j, "left") && (
+                  <div className="absolute top-0 left-0 bottom-0 w-0.5 bg-black" />
+                )}
+              </div>
+            )),
           )}
         </div>
         {solving && (
@@ -294,7 +458,9 @@ const Home = () => {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-sm text-center mt-1">Buscando solución... {progress}%</p>
+            <p className="text-sm text-center mt-1">
+              Buscando solución... {progress}%
+            </p>
           </div>
         )}
       </CardContent>
